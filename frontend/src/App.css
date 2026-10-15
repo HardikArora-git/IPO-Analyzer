@@ -1,0 +1,817 @@
+/* ================================
+   GLOBAL RESET
+================================ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background: #0b1120;
+  color: #e5e7eb;
+  overflow-x: hidden;
+}
+
+/* ================================
+   APP
+================================ */
+
+.app {
+  width: 100%;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top, #172554 0%, transparent 35%),
+    #0b1120;
+
+  /* IMPORTANT: side lines remove */
+  border: none !important;
+}
+
+/* ================================
+   HEADER / NAVBAR
+================================ */
+
+header {
+  width: 100%;
+  min-height: 70px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 15px clamp(15px, 4vw, 60px);
+
+  background: rgba(15, 23, 42, 0.95);
+
+  border: none;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+header h1 {
+  font-size: clamp(18px, 2.5vw, 28px);
+  color: #60a5fa;
+  white-space: nowrap;
+}
+
+header p {
+  display: none;
+}
+
+/* ================================
+   MAIN CONTENT
+================================ */
+
+main {
+  width: 100%;
+  max-width: 1400px;
+
+  margin: 0 auto;
+
+  padding: clamp(20px, 4vw, 50px);
+
+  border: none !important;
+}
+
+/* ================================
+   UPLOAD CARD
+================================ */
+
+.upload-card {
+  width: 100%;
+  max-width: 650px;
+
+  margin: 30px auto;
+
+  padding: clamp(25px, 5vw, 45px);
+
+  background: rgba(30, 41, 59, 0.85);
+
+  border: 1px solid rgba(96, 165, 250, 0.25);
+
+  border-radius: 20px;
+
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.35);
+
+  text-align: center;
+}
+
+.upload-card h2 {
+  color: #60a5fa;
+  margin-bottom: 15px;
+
+  font-size: clamp(20px, 3vw, 28px);
+}
+
+.upload-card p {
+  color: #94a3b8;
+
+  line-height: 1.6;
+
+  margin-bottom: 25px;
+}
+
+/* ================================
+   FILE INPUT
+================================ */
+
+.upload-card input {
+  width: 100%;
+
+  padding: 15px;
+
+  border: 2px dashed #3b82f6;
+
+  border-radius: 12px;
+
+  background: #111827;
+
+  color: #cbd5e1;
+
+  cursor: pointer;
+
+  margin-bottom: 20px;
+}
+
+.file-name {
+  color: #60a5fa !important;
+  font-weight: bold;
+  word-break: break-word;
+}
+
+/* ================================
+   BUTTONS
+================================ */
+
+button {
+  border: none;
+
+  border-radius: 10px;
+
+  padding: 12px 18px;
+
+  font-size: 14px;
+
+  font-weight: 600;
+
+  color: white;
+
+  background: linear-gradient(
+    135deg,
+    #2563eb,
+    #3b82f6
+  );
+
+  cursor: pointer;
+
+  transition: all 0.25s ease;
+}
+
+button:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 8px 20px rgba(59, 130, 246, 0.3);
+}
+
+button:disabled {
+  opacity: 0.6;
+
+  cursor: not-allowed;
+
+  transform: none;
+}
+
+/* ================================
+   CHAT CONTAINER
+================================ */
+
+.chat-container {
+  width: 100%;
+
+  background: rgba(15, 23, 42, 0.9);
+
+  border: 1px solid rgba(148, 163, 184, 0.15);
+
+  border-radius: 20px;
+
+  overflow: hidden;
+
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.35);
+}
+
+/* ================================
+   CHAT HEADER
+================================ */
+
+.chat-header {
+  display: flex;
+
+  flex-wrap: wrap;
+
+  align-items: center;
+
+  gap: 10px;
+
+  padding: 18px;
+
+  background: #172033;
+
+  border-bottom:
+    1px solid rgba(148, 163, 184, 0.15);
+}
+
+.chat-header h2 {
+  width: 100%;
+
+  color: #60a5fa;
+
+  font-size: clamp(20px, 3vw, 26px);
+
+  margin-bottom: 5px;
+}
+
+/* Different buttons */
+
+.summary-btn {
+  background: linear-gradient(135deg, #2563eb, #60a5fa);
+}
+
+.risk-btn {
+  background: linear-gradient(135deg, #dc2626, #f97316);
+}
+
+.financial-btn {
+  background: linear-gradient(135deg, #059669, #10b981);
+}
+
+.new-document {
+  background: #334155;
+}
+
+/* ================================
+   MESSAGES
+================================ */
+
+.messages {
+  width: 100%;
+
+  min-height: 450px;
+  max-height: 65vh;
+
+  overflow-y: auto;
+
+  padding: clamp(15px, 3vw, 30px);
+
+  background: #0f172a;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 18px;
+}
+
+/* Message */
+
+.message {
+  width: fit-content;
+
+  max-width: min(850px, 90%);
+
+  padding: 18px 20px;
+
+  border-radius: 16px;
+
+  line-height: 1.7;
+
+  animation: messageAppear 0.3s ease;
+}
+
+@keyframes messageAppear {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* AI MESSAGE */
+
+.message.ai {
+  align-self: flex-start;
+
+  background: #1e293b;
+
+  color: #e2e8f0;
+
+  border:
+    1px solid rgba(96, 165, 250, 0.2);
+
+  text-align: left;
+}
+
+/* USER MESSAGE */
+
+.message.user {
+  align-self: flex-end;
+
+  background:
+    linear-gradient(135deg, #2563eb, #1d4ed8);
+
+  color: white;
+
+  text-align: left;
+}
+
+/* ================================
+   MARKDOWN OUTPUT
+================================ */
+
+.message.ai h1,
+.message.ai h2,
+.message.ai h3 {
+  color: #60a5fa;
+
+  margin-top: 18px;
+  margin-bottom: 10px;
+
+  text-align: left;
+}
+
+.message.ai h1:first-child,
+.message.ai h2:first-child,
+.message.ai h3:first-child {
+  margin-top: 0;
+}
+
+.message.ai p {
+  margin-bottom: 14px;
+
+  text-align: left;
+}
+
+.message.ai ul,
+.message.ai ol {
+  padding-left: 25px;
+
+  margin-bottom: 15px;
+
+  text-align: left;
+}
+
+.message.ai li {
+  margin-bottom: 8px;
+}
+
+.message.ai strong {
+  color: #93c5fd;
+  font-weight: 700;
+}
+
+.message.user strong {
+  color: white;
+}
+
+/* ================================
+   QUESTION BOX
+================================ */
+
+.question-box {
+  width: 100%;
+
+  display: flex;
+
+  gap: 12px;
+
+  padding: 18px;
+
+  background: #172033;
+
+  border-top:
+    1px solid rgba(148, 163, 184, 0.15);
+}
+
+.question-box input {
+  flex: 1;
+
+  min-width: 0;
+
+  padding: 14px 16px;
+
+  border-radius: 10px;
+
+  border:
+    1px solid rgba(148, 163, 184, 0.25);
+
+  background: #0f172a;
+
+  color: white;
+
+  outline: none;
+
+  font-size: 15px;
+}
+
+.question-box input:focus {
+  border-color: #3b82f6;
+
+  box-shadow:
+    0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.question-box button {
+  min-width: 110px;
+}
+
+/* ================================
+   RISK DASHBOARD
+================================ */
+
+.risk-dashboard {
+  width: 100%;
+
+  margin: 25px 0;
+
+  padding: clamp(20px, 4vw, 35px);
+
+  background: rgba(30, 41, 59, 0.8);
+
+  border:
+    1px solid rgba(96, 165, 250, 0.2);
+
+  border-radius: 20px;
+}
+
+.risk-dashboard > h2 {
+  text-align: center;
+
+  color: #60a5fa;
+
+  margin-bottom: 25px;
+}
+
+.overall-score {
+  text-align: center;
+
+  margin-bottom: 20px;
+}
+
+.overall-score h1 {
+  font-size: clamp(55px, 10vw, 90px);
+
+  color: #60a5fa;
+}
+
+.overall-score p {
+  color: #94a3b8;
+}
+
+.risk-dashboard > h3 {
+  text-align: center;
+
+  margin-bottom: 25px;
+}
+
+/* ================================
+   RISK GRID
+================================ */
+
+.risk-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(auto-fit, minmax(180px, 1fr));
+
+  gap: 15px;
+
+  margin: 25px 0;
+}
+
+.risk-card {
+  padding: 20px;
+
+  background: #0f172a;
+
+  border-radius: 14px;
+
+  border:
+    1px solid rgba(148, 163, 184, 0.15);
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 10px;
+
+  font-size: 15px;
+}
+
+.risk-card strong {
+  font-size: 22px;
+
+  color: #60a5fa;
+}
+
+.risk-summary {
+  padding: 20px;
+
+  background: #0f172a;
+
+  border-radius: 14px;
+
+  border-left: 4px solid #3b82f6;
+}
+
+.risk-summary h3 {
+  color: #60a5fa;
+
+  margin-bottom: 10px;
+}
+
+.risk-summary p {
+  color: #cbd5e1;
+
+  line-height: 1.7;
+
+  text-align: left;
+}
+
+/* ================================
+   TABLET
+================================ */
+
+@media (max-width: 768px) {
+
+  header {
+    padding: 15px 20px;
+  }
+
+  main {
+    padding: 20px 15px;
+  }
+
+  .messages {
+    min-height: 400px;
+  }
+
+  .chat-header {
+    padding: 15px;
+  }
+
+  .chat-header button {
+    flex: 1;
+    min-width: 130px;
+  }
+
+  .message {
+    max-width: 95%;
+  }
+}
+
+/* ================================
+   MOBILE
+================================ */
+
+@media (max-width: 480px) {
+
+  header h1 {
+    font-size: 18px;
+  }
+
+  main {
+    padding: 15px 10px;
+  }
+
+  .upload-card {
+    margin: 15px auto;
+
+    padding: 25px 18px;
+
+    border-radius: 16px;
+  }
+
+  .chat-container {
+    border-radius: 16px;
+  }
+
+  .chat-header {
+    flex-direction: column;
+
+    align-items: stretch;
+  }
+
+  .chat-header h2 {
+    text-align: center;
+  }
+
+  .chat-header button {
+    width: 100%;
+  }
+
+  .messages {
+    padding: 15px 10px;
+
+    min-height: 400px;
+  }
+
+  .message {
+    max-width: 100%;
+
+    padding: 15px;
+
+    font-size: 14px;
+  }
+
+  .question-box {
+    flex-direction: column;
+
+    padding: 12px;
+  }
+
+  .question-box input {
+    width: 100%;
+  }
+
+  .question-box button {
+    width: 100%;
+  }
+
+  .risk-grid {
+    grid-template-columns: 1fr;
+  }
+  .snapshot-card {
+  margin: 20px 0;
+  padding: 22px;
+  border: 1px solid #2e3f62;
+  border-radius: 14px;
+  background: #172033;
+}
+
+.snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.snapshot-item {
+  padding: 14px;
+  border-radius: 10px;
+  background: #202c44;
+}
+
+.snapshot-item span {
+  display: block;
+  margin-bottom: 7px;
+  color: #9caecb;
+  font-size: 13px;
+}
+
+.snapshot-item strong {
+  color: #f8fafc;
+  line-height: 1.45;
+}
+
+.snapshot-error {
+  color: #f87171;
+}
+}
+
+.market-dashboard {
+  margin: 0 0 24px;
+  padding: 22px;
+  border: 1px solid #2e3f62;
+  border-radius: 14px;
+  background: #172033;
+}
+
+.market-search,
+.market-search-controls,
+.market-price-card {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.market-search {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.market-search h2,
+.market-search p {
+  margin: 0;
+}
+
+.market-search p,
+.market-price-card span,
+.delayed-label {
+  color: #9caecb;
+  font-size: 13px;
+}
+
+.market-search-controls input {
+  min-width: 160px;
+  padding: 11px 12px;
+  border: 1px solid #3c4c6b;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.market-price-card {
+  margin: 20px 0;
+  padding: 16px;
+  border-radius: 10px;
+  background: #202c44;
+  flex-wrap: wrap;
+}
+
+.market-price-card > div {
+  min-width: 145px;
+}
+
+.market-price-card h3 {
+  margin: 6px 0 0;
+  color: #f8fafc;
+}
+
+.positive {
+  color: #4ade80 !important;
+}
+
+.negative,
+.market-error {
+  color: #f87171 !important;
+}
+
+.stock-chart {
+  width: 100%;
+  min-height: 360px;
+}
+
+.company-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.company-header h2 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 27px;
+}
+
+.company-header p {
+  margin: 6px 0 0;
+  color: #9caecb;
+}
+
+.follow-btn.following {
+  background: #2563eb;
+  color: white;
+}
+
+.chart-ranges {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0;
+  overflow-x: auto;
+}
+
+.chart-ranges button {
+  min-width: 52px;
+  padding: 9px 12px;
+  color: #9caecb;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+}
+
+.chart-ranges button:hover,
+.chart-ranges button.active-range {
+  color: #93c5fd;
+  background: #1e3a5f;
+  border-color: #2563eb;
+}
+

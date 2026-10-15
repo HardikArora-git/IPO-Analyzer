@@ -1,0 +1,11 @@
+# PDF extraction
+pypdf==6.16.1
+
+# Lightweight local embeddings; avoids requiring a platform-specific torch DLL
+numpy>=2.1,<3
+scikit-learn==1.9.0
+# ChromaDB requires native grpcio/httptools wheels unavailable on Windows ARM64.
+chromadb==0.6.3; platform_machine != "ARM64"
+
+yfinance #yfinance stock market library 
+pandas
