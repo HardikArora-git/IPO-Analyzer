@@ -14,7 +14,9 @@ import re
 # import yfinance as yf
 import operator
 import requests
+import time
 from datetime import datetime, timezone
+from xml.etree import ElementTree as ET
 
 app = FastAPI()
 app.add_middleware(
@@ -37,6 +39,16 @@ UPLOAD_FOLDER.mkdir(exist_ok=True)
 
 # global storage for current upload document
 document_data = {}
+
+# NSE blocks repeated anonymous requests quite aggressively. Keep a short
+# in-memory cache so every browser refresh does not create a new request.
+ipo_calendar_cache = {"updated_at": 0.0, "payload": None}
+NSE_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-IN,en;q=0.9",
+    "Referer": "https://www.nseindia.com/market-data/all-upcoming-issues-ipo",
+}
 
 @app.get("/")
 def home():
@@ -629,6 +641,13 @@ async def get_market_data(symbol: str, range_key: str = "1M"):
             "currency": metadata.get("currency", "INR"),
             "range": range_key.upper(),
             "is_delayed": True,
+            "metrics": {
+                "Open": metadata.get("regularMarketOpen"),
+                "Day high": metadata.get("regularMarketDayHigh"),
+                "Day low": metadata.get("regularMarketDayLow"),
+                "52-wk high": metadata.get("fiftyTwoWeekHigh"),
+                "52-wk low": metadata.get("fiftyTwoWeekLow"),
+            },
             "candles": candles,
         }
 
@@ -640,3 +659,120 @@ async def get_market_data(symbol: str, range_key: str = "1M"):
             status_code=502,
             detail=f"Unable to retrieve market data: {str(error)}"
         )
+
+
+@app.get("/market/{symbol}/news")
+async def get_company_news(symbol: str, company: str = ""):
+    query = company.strip() or symbol.replace(".NS", "")
+
+    try:
+        response = requests.get(
+            "https://news.google.com/rss/search",
+            params={
+                "q": f"{query} stock India",
+                "hl": "en-IN",
+                "gl": "IN",
+                "ceid": "IN:en",
+            },
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=12,
+        )
+        response.raise_for_status()
+
+        root = ET.fromstring(response.content)
+        articles = []
+
+        for item in root.findall("./channel/item")[:6]:
+            source = item.find("source")
+            articles.append({
+                "title": item.findtext("title", "Market update"),
+                "url": item.findtext("link", "#"),
+                "published_at": item.findtext("pubDate", "Recent"),
+                "source": source.text if source is not None else "News",
+            })
+
+        return {"articles": articles}
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Unable to retrieve company news: {str(error)}"
+        )
+
+
+@app.get("/ipo-calendar")
+async def get_ipo_calendar():
+    """Return the current official NSE public-issue feed without inventing data."""
+    cache_age_seconds = 300
+    now = time.time()
+
+    if (
+        ipo_calendar_cache["payload"] is not None
+        and now - ipo_calendar_cache["updated_at"] < cache_age_seconds
+    ):
+        return {**ipo_calendar_cache["payload"], "cached": True}
+
+    try:
+        session = requests.Session()
+        session.headers.update(NSE_HEADERS)
+
+        # NSE normally sets the required cookies on its home page. The API can
+        # still respond without them on some networks, so do not fail early.
+        try:
+            session.get("https://www.nseindia.com", timeout=10)
+        except requests.RequestException:
+            pass
+
+        response = session.get(
+            "https://www.nseindia.com/api/ipo-current-issue",
+            timeout=15,
+        )
+        response.raise_for_status()
+        raw_issues = response.json()
+
+        if isinstance(raw_issues, dict):
+            raw_issues = raw_issues.get("data", [])
+        elif not isinstance(raw_issues, list):
+            raw_issues = []
+
+        issues = []
+        for issue in raw_issues:
+            if not isinstance(issue, dict):
+                continue
+
+            subscription = issue.get("noOfTime")
+            try:
+                subscription_display = f"{float(subscription):.2f}x"
+            except (TypeError, ValueError):
+                subscription_display = "—"
+
+            issues.append({
+                "company": issue.get("companyName") or issue.get("symbol") or "NSE issue",
+                "symbol": issue.get("symbol") or "—",
+                "security_type": issue.get("series") or "—",
+                "open_date": issue.get("issueStartDate") or "—",
+                "close_date": issue.get("issueEndDate") or "—",
+                "price_band": issue.get("issuePrice") or "—",
+                "status": issue.get("status") or "Unknown",
+                "subscription": subscription_display,
+            })
+
+        payload = {
+            "issues": issues,
+            "source": "NSE India",
+            "source_url": "https://www.nseindia.com/market-data/all-upcoming-issues-ipo",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "cached": False,
+        }
+        ipo_calendar_cache["updated_at"] = now
+        ipo_calendar_cache["payload"] = payload
+        return payload
+
+    except (requests.RequestException, ValueError, TypeError) as error:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "NSE's live IPO feed is temporarily unavailable. "
+                "Please try Refresh live data in a moment."
+            ),
+        ) from error

@@ -41,6 +41,18 @@ function App() {
   const [loadingStock, setLoadingStock] = useState(false);
   const [stockError, setStockError] = useState("");
   const [chartRange, setChartRange] = useState("1M"); // Default range is 1 month
+  const [marketNews, setMarketNews] = useState([]);
+  const [loadingNews, setLoadingNews] = useState(false);
+  const [newsError, setNewsError] = useState("");
+  const [activeView, setActiveView] = useState("home");
+  const [homeSearch, setHomeSearch] = useState("");
+  const [ipoTab, setIpoTab] = useState("Open");
+  const [ipoFilter, setIpoFilter] = useState("All");
+  const [ipoPage, setIpoPage] = useState(1);
+  const [ipoIssues, setIpoIssues] = useState([]);
+  const [loadingIpoIssues, setLoadingIpoIssues] = useState(false);
+  const [ipoCalendarError, setIpoCalendarError] = useState("");
+  const [ipoCalendarMeta, setIpoCalendarMeta] = useState(null);
   
   /* =========================
      HELPER: API ERROR
@@ -482,37 +494,43 @@ ${error.message}`,
 
 
   /* =========================
-     QUICK QUESTIONS
-  ========================= */
-
-  const handleQuickQuestion = (quickQuestion) => {
-    if (asking) return;
-
-    setQuestion(quickQuestion);
-
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          type: "user",
-          text: quickQuestion,
-        },
-      ]);
-    }, 0);
-  };
-
-  /* =========================
      stock chart search
   ========================= */
-  const handleStockSearch = async (requestedRange = chartRange) => {
-  if (!stockSymbol.trim() || loadingStock) return;
+  const loadMarketNews = async (company) => {
+    setLoadingNews(true);
+    setNewsError("");
+
+    try {
+      const response = await fetch(
+        `${API_URL}/market/${encodeURIComponent(stockSymbol)}/news?company=${encodeURIComponent(company)}`
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(getErrorMessage(data));
+      }
+
+      setMarketNews(data.articles || []);
+    } catch (error) {
+      setMarketNews([]);
+      setNewsError(error.message);
+    } finally {
+      setLoadingNews(false);
+    }
+  };
+
+  const handleStockSearch = async (requestedRange = chartRange, requestedSymbol = stockSymbol) => {
+  const selectedRange = typeof requestedRange === "string" ? requestedRange : chartRange;
+  const selectedSymbol = requestedSymbol.trim().toUpperCase();
+
+  if (!selectedSymbol || loadingStock) return;
 
   setLoadingStock(true);
   setStockError("");
 
   try {
     const response = await fetch(
-      `${API_URL}/market/${encodeURIComponent(stockSymbol)}?range_key=${requestedRange}`
+      `${API_URL}/market/${encodeURIComponent(selectedSymbol)}?range_key=${selectedRange}`
     );
 
     const data = await response.json();
@@ -521,8 +539,10 @@ ${error.message}`,
       throw new Error(getErrorMessage(data));
     }
 
-    setChartRange(requestedRange);
+    setStockSymbol(selectedSymbol);
+    setChartRange(selectedRange);
     setStockData(data);
+    loadMarketNews(data.company_name || selectedSymbol);
   } catch (error) {
     setStockData(null);
     setStockError(error.message);
@@ -574,9 +594,78 @@ ${error.message}`,
     setSnapshot(null);
   };
 
+  const loadIpoCalendar = async () => {
+    setLoadingIpoIssues(true);
+    setIpoCalendarError("");
+
+    try {
+      const response = await fetch(`${API_URL}/ipo-calendar`);
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(getErrorMessage(data));
+      }
+
+      setIpoIssues(Array.isArray(data?.issues) ? data.issues : []);
+      setIpoCalendarMeta({
+        source: data?.source || "NSE India",
+        updatedAt: data?.updated_at,
+        sourceUrl: data?.source_url,
+        cached: data?.cached,
+      });
+      setIpoPage(1);
+    } catch (requestError) {
+      setIpoCalendarError(requestError.message || "Unable to load the live IPO calendar.");
+      setIpoIssues([]);
+    } finally {
+      setLoadingIpoIssues(false);
+    }
+  };
+
+  const openIpoZone = () => {
+    setActiveView("ipo");
+    loadIpoCalendar();
+  };
+
   const isFollowing = stockData
   ? watchlist.includes(stockData.symbol)
   : false;
+
+  const openResearch = () => {
+    setActiveView("research");
+  };
+
+  const handleHomeSearch = (event) => {
+    event.preventDefault();
+    const symbol = homeSearch.trim().toUpperCase();
+
+    if (symbol) {
+      setStockSymbol(symbol);
+    }
+
+    setActiveView("markets");
+    handleStockSearch(chartRange, symbol || stockSymbol);
+  };
+
+  const filteredIpoIssues = ipoIssues.filter((issue) => {
+    const status = (issue.status || "").toLowerCase();
+    const matchesTab =
+      ipoTab === "Open"
+        ? status.includes("active") || status.includes("open")
+        : ipoTab === "Upcoming"
+          ? status.includes("upcoming")
+          : ipoTab === "Closed"
+            ? status.includes("closed")
+            : status.includes("listed");
+    const matchesFilter = ipoFilter === "All" || issue.security_type === ipoFilter;
+    return matchesTab && matchesFilter;
+  });
+  const ipoPageSize = 4;
+  const ipoPageCount = Math.max(1, Math.ceil(filteredIpoIssues.length / ipoPageSize));
+  const visibleIpoIssues = filteredIpoIssues.slice(
+    (ipoPage - 1) * ipoPageSize,
+    ipoPage * ipoPageSize
+  );
 
   /* =========================
      RENDER
@@ -587,19 +676,392 @@ ${error.message}`,
 
       {/* ================= HEADER ================= */}
 
-      <header>
-        <h1>📊 IPO AI Analyzer</h1>
+      <header className="site-header">
+        <button className="brand" onClick={() => setActiveView("home")}>
+          <span className="brand-mark">IX</span>
+          <span>InsightX <em>AI</em></span>
+        </button>
 
-        <p>
-          AI-powered IPO document analysis for smarter investment research
-        </p>
+        <nav className="main-nav" aria-label="Main navigation">
+          <button onClick={() => setActiveView("markets")}>Markets</button>
+          <button onClick={() => setActiveView("markets")}>Stocks</button>
+          <button onClick={() => setActiveView("home")}>Discover</button>
+          <button onClick={openIpoZone}>IPOs</button>
+          <button onClick={openResearch}>AI Research</button>
+        </nav>
+
+        <button className="profile-button" aria-label="Open profile">
+          <span>H</span>
+          <b>Profile</b>
+        </button>
       </header>
 
       <main>
 
+        {activeView === "home" && (
+          <section className="home-page">
+            <div className="home-hero" id="discover">
+              <div className="hero-copy">
+                <p className="eyebrow">INDIA'S RESEARCH-FIRST MARKET PLATFORM</p>
+                <h1>Invest with <span>clarity,</span><br />not noise.</h1>
+                <p className="hero-description">
+                  Explore markets, understand IPO documents, and turn complex financial information into clear, AI-powered research.
+                </p>
+
+                <div className="hero-actions">
+                  <button className="primary-cta" onClick={openResearch}>Start AI research <span>→</span></button>
+                  <button className="secondary-cta" onClick={() => setActiveView("markets")}>Explore markets</button>
+                </div>
+              </div>
+
+              <div className="hero-visual" aria-hidden="true">
+                <div className="orb orb-one" />
+                <div className="orb orb-two" />
+                <div className="signal-card signal-main">
+                  <div className="signal-heading"><span className="pulse-dot" /> MARKET SIGNAL</div>
+                  <strong>Research before reaction.</strong>
+                  <div className="mini-chart"><i /><i /><i /><i /><i /><i /><i /></div>
+                </div>
+                <div className="signal-card signal-float">
+                  <span>AI RESEARCH</span>
+                  <strong>DRHP → Insight</strong>
+                </div>
+              </div>
+            </div>
+
+            <section className="market-overview" id="market-overview">
+              <div className="section-title-row">
+                <div>
+                  <p className="eyebrow">MARKET OVERVIEW</p>
+                  <h2>Start with the market pulse.</h2>
+                </div>
+                <button className="text-link" onClick={() => setActiveView("markets")}>Open market workspace <span>→</span></button>
+              </div>
+
+              <div className="index-grid">
+                {[
+                  ["NIFTY 50", "India's 50 leading companies", "NI"],
+                  ["SENSEX", "30 large-cap BSE companies", "SE"],
+                  ["BANK NIFTY", "Banking sector benchmark", "BN"],
+                  ["INDIA VIX", "Market volatility indicator", "VX"],
+                ].map(([name, description, code]) => (
+                  <button className="index-card" key={name} onClick={() => setActiveView("markets")}>
+                    <span className="index-icon">{code}</span>
+                    <span className="index-content"><b>{name}</b><small>{description}</small></span>
+                    <span className="card-arrow">↗</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <form className="universal-search" onSubmit={handleHomeSearch}>
+              <span className="search-icon">⌕</span>
+              <input
+                value={homeSearch}
+                onChange={(event) => setHomeSearch(event.target.value)}
+                placeholder="Search stocks, companies, IPOs, or ask InsightX AI..."
+                aria-label="Search markets and research"
+              />
+              <kbd>Enter</kbd>
+            </form>
+
+            <section className="product-rail" id="stocks-preview">
+              <article>
+                <span className="feature-number">01</span>
+                <h3>Markets & stocks</h3>
+                <p>Company pages, price history, watchlists, and market context in one calm workspace.</p>
+              </article>
+              <article>
+                <span className="feature-number">02</span>
+                <h3>IPOs decoded</h3>
+                <p>Upload a DRHP or RHP and surface the numbers, risks, and promises that matter.</p>
+              </article>
+              <article>
+                <span className="feature-number">03</span>
+                <h3>AI in your language</h3>
+                <p>Ask in English, Hindi, or Hinglish and get simple, document-grounded answers.</p>
+              </article>
+            </section>
+          </section>
+        )}
+
+        {activeView === "markets" && (
+          <section className="market-page">
+            <div className="market-page-topbar">
+              <button className="back-link" onClick={() => setActiveView("home")}>← Discover</button>
+              <span>STOCKS</span>
+              <button className="research-link" onClick={openResearch}>Analyze an IPO →</button>
+            </div>
+
+            <div className="market-search-panel">
+              <div>
+                <p className="eyebrow">COMPANY EXPLORER</p>
+                <h1>Research any listed company.</h1>
+              </div>
+              <div className="market-search-controls market-page-search">
+                <input
+                  value={stockSymbol}
+                  onChange={(event) => setStockSymbol(event.target.value.toUpperCase())}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") handleStockSearch();
+                  }}
+                  placeholder="Enter NSE symbol, e.g. TCS"
+                />
+                <button onClick={() => handleStockSearch()} disabled={loadingStock}>
+                  {loadingStock ? "Loading..." : "Search"}
+                </button>
+              </div>
+            </div>
+
+            {stockError && <p className="market-error">{stockError}</p>}
+
+            {!stockData && !loadingStock && (
+              <div className="market-empty-state">
+                <span>⌁</span>
+                <h2>Start with a company symbol</h2>
+                <p>Try RELIANCE, TCS, INFY, HDFCBANK, or ITC.</p>
+              </div>
+            )}
+
+            {stockData && (
+              <>
+                <div className="company-profile-header">
+                  <div>
+                    <p className="eyebrow">NSE · {stockData.symbol.replace(".NS", "")}</p>
+                    <h2>{stockData.company_name || stockData.symbol}</h2>
+                    <p className="market-disclaimer">Delayed market data · For research, not investment advice</p>
+                  </div>
+                  <button className={`follow-btn ${isFollowing ? "following" : ""}`} onClick={handleFollow}>
+                    {isFollowing ? "✓ Following" : "+ Follow"}
+                  </button>
+                </div>
+
+                <div className="quote-row">
+                  <div><span>Latest price</span><strong>₹{Number(stockData.price).toLocaleString("en-IN")}</strong></div>
+                  <div><span>Day change</span><strong className={stockData.change >= 0 ? "positive" : "negative"}>{stockData.change >= 0 ? "+" : ""}{stockData.change} ({stockData.change_percent}%)</strong></div>
+                  <div><span>Currency</span><strong>{stockData.currency || "INR"}</strong></div>
+                </div>
+
+                <div className="chart-ranges market-ranges">
+                  {["1D", "5D", "1M", "6M", "YTD", "1Y", "5Y", "MAX"].map((range) => (
+                    <button key={range} className={chartRange === range ? "active-range" : ""} onClick={() => handleStockSearch(range)} disabled={loadingStock}>{range}</button>
+                  ))}
+                </div>
+
+                <div className="market-chart-card"><StockChart candles={stockData.candles} /></div>
+
+                <div className="market-details-grid">
+                  <section className="market-detail-card">
+                    <div className="card-title-row"><h3>Market information</h3><span>LIVE VIEW</span></div>
+                    <div className="metrics-grid">
+                      {Object.entries(stockData.metrics || {}).map(([label, value]) => (
+                        <div key={label}><span>{label}</span><b>{value == null ? "—" : `₹${Number(value).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`}</b></div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="market-detail-card news-card">
+                    <div className="card-title-row"><h3>Relevant news</h3><span>{loadingNews ? "LOADING" : "LATEST"}</span></div>
+                    {newsError && <p className="market-error">{newsError}</p>}
+                    {!loadingNews && !newsError && marketNews.length === 0 && <p className="news-empty">No recent articles found for this company.</p>}
+                    <div className="news-list">
+                      {marketNews.map((article, index) => (
+                        <a href={article.url} target="_blank" rel="noreferrer" key={`${article.url}-${index}`}>
+                          <span>{article.source}</span>
+                          <b>{article.title}</b>
+                          <small>{article.published_at}</small>
+                        </a>
+                      ))}
+                    </div>
+                  </section>
+                </div>
+              </>
+            )}
+          </section>
+        )}
+
+        {activeView === "ipo" && (
+          <section className="ipo-zone">
+            <div className="ipo-zone-topbar">
+              <button className="back-link" onClick={() => setActiveView("home")}>← Discover</button>
+              <span>IPO ZONE</span>
+              <button className="research-link" onClick={openResearch}>Upload a DRHP →</button>
+            </div>
+
+            <div className="ipo-hero">
+              <div>
+                <p className="eyebrow">IPO RESEARCH, SIMPLIFIED</p>
+                <h1>Know the business<br />before the <span>buzz.</span></h1>
+                <p>Track upcoming issues, decode offer documents, compare key risks, and build your own evidence-based IPO thesis.</p>
+                <div className="ipo-hero-actions">
+                  <button className="primary-cta" onClick={openResearch}>Analyze a DRHP <span>→</span></button>
+                  <button className="secondary-cta" onClick={() => document.getElementById("ipo-calendar")?.scrollIntoView({ behavior: "smooth" })}>View IPO calendar</button>
+                </div>
+              </div>
+
+              <div className="ipo-score-preview" aria-label="IPO research preview">
+                <div className="ipo-score-header"><span>INSIGHTX IPO SCORE</span><b>PRE-ISSUE</b></div>
+                <div className="score-orbit"><strong>?</strong><small>Research begins<br />with the DRHP</small></div>
+                <div className="score-factors"><span>Financial health</span><span>Valuation context</span><span>Risk factors</span></div>
+              </div>
+            </div>
+
+            <section className="ipo-calendar" id="ipo-calendar">
+              <div className="section-title-row">
+                <div>
+                  <p className="eyebrow">IPO CALENDAR</p>
+                  <h2>Find the issue worth researching.</h2>
+                </div>
+                <div className="ipo-tabs" role="tablist" aria-label="IPO status">
+                  {["Upcoming", "Open", "Closed", "Listed"].map((tab) => (
+                    <button key={tab} onClick={() => { setIpoTab(tab); setIpoPage(1); }} className={ipoTab === tab ? "active-ipo-tab" : ""}>{tab}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="ipo-tracker-note">
+                <span>LIVE • NSE INDIA</span>
+                <p>
+                  Current public issues are loaded from NSE India. {ipoCalendarMeta?.cached ? "Recently refreshed data is being shown." : "Refresh for the latest available feed."}
+                  {ipoCalendarMeta?.sourceUrl && <> <a href={ipoCalendarMeta.sourceUrl} target="_blank" rel="noreferrer">View source ↗</a></>}
+                </p>
+              </div>
+
+              <div className="ipo-filter-bar">
+                <div>
+                  <span>Security type</span>
+                  {["All", "EQ"].map((filter) => (
+                    <button
+                      key={filter}
+                      className={ipoFilter === filter ? "active-filter" : ""}
+                      onClick={() => {
+                        setIpoFilter(filter);
+                        setIpoPage(1);
+                      }}
+                    >
+                      {filter}
+                    </button>
+                  ))}
+                </div>
+                <button className="filter-icon" onClick={loadIpoCalendar} disabled={loadingIpoIssues}>
+                  {loadingIpoIssues ? "Refreshing…" : "↻ Refresh live data"}
+                </button>
+              </div>
+
+              <div className="ipo-table-shell">
+                <table className="ipo-table">
+                  <thead>
+                    <tr>
+                      <th>Company</th>
+                      <th>Symbol</th>
+                      <th>Price band</th>
+                      <th>Open</th>
+                      <th>Close</th>
+                      <th>Status</th>
+                      <th>Subscription</th>
+                      <th aria-label="Open IPO analysis" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingIpoIssues && (
+                      <tr><td className="ipo-table-message" colSpan="8">Loading the latest NSE public issues…</td></tr>
+                    )}
+                    {!loadingIpoIssues && ipoCalendarError && (
+                      <tr><td className="ipo-table-message ipo-table-error" colSpan="8">{ipoCalendarError}</td></tr>
+                    )}
+                    {!loadingIpoIssues && !ipoCalendarError && visibleIpoIssues.length === 0 && (
+                      <tr><td className="ipo-table-message" colSpan="8">No {ipoTab.toLowerCase()} NSE issues are available in the current feed.</td></tr>
+                    )}
+                    {!loadingIpoIssues && visibleIpoIssues.map((issue) => (
+                      <tr key={issue.company}>
+                        <td><b>{issue.company}</b><small>{issue.security_type}</small></td>
+                        <td>{issue.symbol}</td>
+                        <td>{issue.price_band}</td>
+                        <td>{issue.open_date}</td>
+                        <td>{issue.close_date}</td>
+                        <td><span className="ipo-status">{issue.status}</span></td>
+                        <td className="growth-cell">{issue.subscription}</td>
+                        <td><button className="read-ipo-btn" onClick={openResearch}>Analyze</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="ipo-pagination" aria-label="IPO tracker pages">
+                <button disabled={ipoPage === 1} onClick={() => setIpoPage((page) => page - 1)}>←</button>
+                {Array.from({ length: ipoPageCount }, (_, index) => index + 1).map((page) => (
+                  <button key={page} className={ipoPage === page ? "active-page" : ""} onClick={() => setIpoPage(page)}>{page}</button>
+                ))}
+                <button disabled={ipoPage === ipoPageCount} onClick={() => setIpoPage((page) => page + 1)}>→</button>
+              </div>
+            </section>
+
+            <section className="ipo-tool-grid">
+              <article className="ipo-tool ipo-tool-featured">
+                <span className="tool-icon">✦</span>
+                <p className="eyebrow">DRHP INTELLIGENCE</p>
+                <h3>Turn a 600-page prospectus into a research brief.</h3>
+                <p>Extract the company story, financial signals, use of proceeds, risks, and question-ready evidence.</p>
+                <button className="text-link" onClick={openResearch}>Upload a document <span>→</span></button>
+              </article>
+              <article className="ipo-tool">
+                <span className="tool-icon">◌</span>
+                <h3>Subscription tracker</h3>
+                <p>Compare retail, HNI, and QIB subscription when a verified live IPO feed is connected.</p>
+                <span className="coming-soon">DATA FEED READY</span>
+              </article>
+              <article className="ipo-tool">
+                <span className="tool-icon">↗</span>
+                <h3>Listing radar</h3>
+                <p>Track listing-day performance, post-listing price action, and the gap between hype and reality.</p>
+                <span className="coming-soon">COMING NEXT</span>
+              </article>
+              <article className="ipo-tool">
+                <span className="tool-icon">◎</span>
+                <h3>Peer comparison</h3>
+                <p>Put issue valuation, growth, margins, and risks next to listed peers—not social-media tips.</p>
+                <span className="coming-soon">COMING NEXT</span>
+              </article>
+            </section>
+
+            <section className="ipo-checklist">
+              <div>
+                <p className="eyebrow">THE INSIGHTX FRAMEWORK</p>
+                <h2>Four questions before you apply.</h2>
+              </div>
+              <ol>
+                <li><b>What is changing?</b><span>Identify the growth trigger, not just the headline.</span></li>
+                <li><b>Where does the money go?</b><span>Review use of proceeds, debt reduction, and promoter exits.</span></li>
+                <li><b>What can go wrong?</b><span>Read the concentration, litigation, governance, and execution risks.</span></li>
+                <li><b>What are the alternatives?</b><span>Compare the business and its valuation with listed peers.</span></li>
+              </ol>
+            </section>
+
+            <footer className="site-footer">
+              <div className="footer-brand">
+                <button className="brand" onClick={() => setActiveView("home")}>
+                  <span className="brand-mark">IX</span>
+                  <span>InsightX <em>AI</em></span>
+                </button>
+                <p>Market intelligence for curious investors. Research first, react later.</p>
+              </div>
+              <div className="footer-links">
+                <div><b>Product</b><button onClick={() => setActiveView("markets")}>Markets</button><button onClick={openIpoZone}>IPO Zone</button><button onClick={openResearch}>AI Research</button></div>
+                <div><b>Research</b><button onClick={openResearch}>Upload a DRHP</button><button onClick={openResearch}>IPO checklist</button><button onClick={() => setActiveView("markets")}>Watchlist</button></div>
+                <div><b>Support</b><button>Privacy</button><button>Terms</button><button>Contact</button></div>
+              </div>
+              <div className="footer-bottom">
+                <p>ⓘ InsightX does not provide buy/sell recommendations or investment tips. Information is for educational and research purposes only.</p>
+                <span>© 2026 InsightX AI</span>
+              </div>
+            </footer>
+          </section>
+        )}
+
         {/* ================= UPLOAD SCREEN ================= */}
 
-        {!uploaded && (
+        {activeView === "research" && !uploaded && (
           <section className="upload-card">
 
             <h2>📄 Upload IPO Document</h2>
@@ -646,7 +1108,7 @@ ${error.message}`,
 
         {/* ================= MAIN DASHBOARD ================= */}
 
-        {uploaded && (
+        {activeView === "research" && uploaded && (
 
           <>
 
