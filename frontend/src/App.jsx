@@ -804,8 +804,8 @@ const loadIpoCalendar = async () => {
 
       <header className="site-header">
         <button className="brand" onClick={() => setActiveView("home")}>
-          <span className="brand-mark">IX</span>
-          <span>InsightX <em>AI</em></span>
+          <span className="brand-mark">GI</span>
+          <span>GreenIPO <em>AI</em></span>
         </button>
 
         <nav className="main-nav" aria-label="Main navigation">
@@ -885,7 +885,7 @@ const loadIpoCalendar = async () => {
               <input
                 value={homeSearch}
                 onChange={(event) => setHomeSearch(event.target.value)}
-                placeholder="Search stocks, companies, IPOs, or ask InsightX AI..."
+                placeholder="Search stocks, companies, IPOs, or ask GreenIPO AI..."
                 aria-label="Search markets and research"
               />
               <kbd>Enter</kbd>
@@ -1122,7 +1122,7 @@ const loadIpoCalendar = async () => {
               </div>
 
               <div className="ipo-score-preview" aria-label="IPO research preview">
-                <div className="ipo-score-header"><span>INSIGHTX IPO SCORE</span><b>PRE-ISSUE</b></div>
+                <div className="ipo-score-header"><span>GreenIPO SCORE</span><b>PRE-ISSUE</b></div>
                 <div className="score-orbit"><strong>?</strong><small>Research begins<br />with the DRHP</small></div>
                 <div className="score-factors"><span>Financial health</span><span>Valuation context</span><span>Risk factors</span></div>
               </div>
@@ -1249,7 +1249,7 @@ const loadIpoCalendar = async () => {
 
             <section className="ipo-checklist">
               <div>
-                <p className="eyebrow">THE INSIGHTX FRAMEWORK</p>
+                <p className="eyebrow">THE GreenIPO FRAMEWORK</p>
                 <h2>Four questions before you apply.</h2>
               </div>
               <ol>
@@ -1264,7 +1264,7 @@ const loadIpoCalendar = async () => {
               <div className="footer-brand">
                 <button className="brand" onClick={() => setActiveView("home")}>
                   <span className="brand-mark">IX</span>
-                  <span>InsightX <em>AI</em></span>
+                  <span>GreenIPO <em>AI</em></span>
                 </button>
                 <p>Market intelligence for curious investors. Research first, react later.</p>
               </div>
@@ -1274,8 +1274,8 @@ const loadIpoCalendar = async () => {
                 <div><b>Support</b><button>Privacy</button><button>Terms</button><button>Contact</button></div>
               </div>
               <div className="footer-bottom">
-                <p>ⓘ InsightX does not provide buy/sell recommendations or investment tips. Information is for educational and research purposes only.</p>
-                <span>© 2026 InsightX AI</span>
+                <p>ⓘ GreenIPO does not provide buy/sell recommendations or investment tips. Information is for educational and research purposes only.</p>
+                <span>© 2026 GreenIPO AI</span>
               </div>
             </footer>
           </section>
