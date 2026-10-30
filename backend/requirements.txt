@@ -9,3 +9,14 @@ chromadb==0.6.3; platform_machine != "ARM64"
 
 yfinance #yfinance stock market library 
 pandas
+
+requests
+httpx
+
+# Web framework
+fastapi
+uvicorn[standard]
+
+
+# Environment variables
+python-dotenv
