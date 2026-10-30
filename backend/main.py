@@ -6,6 +6,12 @@ from embedding import create_embedding, create_query_embedding
 from vector_store import store_embeddings
 from semantic_search import search
 
+import asyncio
+import logging
+import time
+
+import httpx
+
 # PDF path
 pdf_path = Path(__file__).resolve().parent.parent / "data" / "PPT3_HowtoinvestinIPO.pdf"
 

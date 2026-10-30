@@ -935,3 +935,247 @@ button:disabled {
   border-color: #2563eb;
 }
 
+/* ================================
+   MARKET DASHBOARD — HERO
+================================ */
+
+.mkt-hero {
+  padding: 52px clamp(20px, 5vw, 80px) 36px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.mkt-hero-copy h1 {
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 8px 0 12px;
+  letter-spacing: -0.02em;
+}
+
+.mkt-hero-copy p {
+  color: #94a3b8;
+  font-size: 16px;
+  max-width: 540px;
+}
+
+/* ================================
+   LIVE INDEX TICKERS
+================================ */
+
+.index-tickers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  padding: 28px clamp(20px, 5vw, 80px);
+  background: rgba(15, 23, 42, 0.5);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+}
+
+.index-tickers-loading {
+  grid-column: 1 / -1;
+  color: #64748b;
+  font-size: 14px;
+  padding: 12px 0;
+}
+
+.index-ticker-card {
+  padding: 20px 22px;
+  border-radius: 14px;
+  background: #111827;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.2s, transform 0.15s;
+}
+
+.index-ticker-card:hover {
+  transform: translateY(-2px);
+}
+
+.index-ticker-card.idx-up {
+  border-top: 2px solid #22c55e;
+}
+
+.index-ticker-card.idx-down {
+  border-top: 2px solid #ef4444;
+}
+
+.idx-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.idx-name {
+  font-weight: 700;
+  font-size: 13px;
+  color: #cbd5e1;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.idx-label {
+  font-size: 10px;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: right;
+}
+
+.idx-price {
+  font-size: 24px;
+  font-weight: 800;
+  color: #f8fafc;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.idx-change {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ================================
+   MARKET CATEGORY NEWS
+================================ */
+
+.market-cat-section {
+  padding: 48px clamp(20px, 5vw, 80px) 52px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+}
+
+.market-cat-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.market-cat-header h2 {
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 6px 0 0;
+}
+
+.market-cat-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.market-cat-tabs button {
+  padding: 9px 18px;
+  border-radius: 100px;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+
+.market-cat-tabs button:hover {
+  background: rgba(37, 99, 235, 0.15);
+  color: #93c5fd;
+  border-color: rgba(37, 99, 235, 0.4);
+}
+
+.market-cat-tabs button.active-cat-tab {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+  font-weight: 600;
+}
+
+.cat-subtitle {
+  font-size: 13px;
+  color: #64748b;
+  margin: 14px 0 24px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+
+.cat-news-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #64748b;
+  font-size: 14px;
+  padding: 32px 0;
+}
+
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(148, 163, 184, 0.2);
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.cat-news-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.cat-news-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 22px;
+  border-radius: 14px;
+  background: #111827;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  text-decoration: none;
+  transition: border-color 0.18s, background 0.18s, transform 0.15s;
+}
+
+.cat-news-card:hover {
+  border-color: rgba(59, 130, 246, 0.45);
+  background: #141e2e;
+  transform: translateY(-2px);
+}
+
+.cat-news-source {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.cat-news-title {
+  color: #e2e8f0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.cat-news-date {
+  font-size: 11px;
+  color: #475569;
+  margin-top: auto;
+}
+
+/* ================================
+   STOCK RESULT WRAPPER
+================================ */
+
+.stock-result-wrapper {
+  padding: 0 clamp(20px, 5vw, 80px) 48px;
+}
+

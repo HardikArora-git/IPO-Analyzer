@@ -1,3 +1,4 @@
+import logging
 from operator import index
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -17,6 +18,9 @@ import requests
 import time
 from datetime import datetime, timezone
 from xml.etree import ElementTree as ET
+import asyncio    
+import httpx
+
 
 app = FastAPI()
 app.add_middleware(
@@ -42,13 +46,24 @@ document_data = {}
 
 # NSE blocks repeated anonymous requests quite aggressively. Keep a short
 # in-memory cache so every browser refresh does not create a new request.
-ipo_calendar_cache = {"updated_at": 0.0, "payload": None}
-NSE_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36",
-    "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "en-IN,en;q=0.9",
-    "Referer": "https://www.nseindia.com/market-data/all-upcoming-issues-ipo",
+IPO_API_URL = "https://www.xflot.com/api/public/market/ipos"
+IPO_CACHE_TTL = 60
+
+ipo_calendar_cache = {
+    "updated_at": 0.0,
+    "payload": None,
 }
+
+ipo_fetch_lock = asyncio.Lock()
+
+logger = logging.getLogger(__name__)
+
+# NSE_HEADERS = {
+#     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36",
+#     "Accept": "application/json, text/plain, */*",
+#     "Accept-Language": "en-IN,en;q=0.9",
+#     "Referer": "https://www.nseindia.com/market-data/all-upcoming-issues-ipo",
+# }
 
 @app.get("/")
 def home():
@@ -340,14 +355,14 @@ Return ONLY valid JSON.
 Use exactly this structure:
 
 {
-  "overall_score": 0,
-  "risk_level": "Low",
-  "financial_risk": 0,
-  "business_risk": 0,
-  "market_risk": 0,
-  "regulatory_risk": 0,
-  "operational_risk": 0,
-  "summary": "Short explanation of the overall IPO risk"
+"overall_score": 0,
+"risk_level": "Low",
+"financial_risk": 0,
+"business_risk": 0,
+"market_risk": 0,
+"regulatory_risk": 0,
+"operational_risk": 0,
+"summary": "Short explanation of the overall IPO risk"
 }
 
 Rules:
@@ -466,7 +481,7 @@ Rules:
 - Use ONLY information available in the provided IPO document.
 - Do not invent information.
 - If information is unavailable, write:
-  "Not available in the document"
+"Not available in the document"
 - Keep each value short and clear.
 """
 
@@ -502,16 +517,16 @@ Return ONLY valid JSON. Do not use markdown or ```json fences.
 
 Use exactly these keys:
 {
-  "company_name": "",
-  "sector": "",
-  "issue_size": "",
-  "price_band": "",
-  "lot_size": "",
-  "ipo_open_date": "",
-  "ipo_close_date": "",
-  "listing_date": "",
-  "use_of_proceeds": "",
-  "top_risks": ""
+"company_name": "",
+"sector": "",
+"issue_size": "",
+"price_band": "",
+"lot_size": "",
+"ipo_open_date": "",
+"ipo_close_date": "",
+"listing_date": "",
+"use_of_proceeds": "",
+"top_risks": ""
 }
 
 Rules:
@@ -700,79 +715,288 @@ async def get_company_news(symbol: str, company: str = ""):
         )
 
 
-@app.get("/ipo-calendar")
-async def get_ipo_calendar():
-    """Return the current official NSE public-issue feed without inventing data."""
-    cache_age_seconds = 300
-    now = time.time()
+@app.get("/market-overview")
+async def get_market_overview():
+    """
+    Fetch live price data for major Indian market indices from Yahoo Finance.
+    Returns NIFTY 50, SENSEX, BANK NIFTY, and INDIA VIX.
+    """
+    indices = [
+        {"name": "NIFTY 50",   "symbol": "^NSEI",     "label": "NSE Benchmark"},
+        {"name": "SENSEX",     "symbol": "^BSESN",    "label": "BSE Benchmark"},
+        {"name": "BANK NIFTY", "symbol": "^NSEBANK",  "label": "Banking Sector"},
+        {"name": "INDIA VIX",  "symbol": "^INDIAVIX", "label": "Volatility Index"},
+    ]
 
-    if (
-        ipo_calendar_cache["payload"] is not None
-        and now - ipo_calendar_cache["updated_at"] < cache_age_seconds
-    ):
-        return {**ipo_calendar_cache["payload"], "cached": True}
+    results = []
 
-    try:
-        session = requests.Session()
-        session.headers.update(NSE_HEADERS)
-
-        # NSE normally sets the required cookies on its home page. The API can
-        # still respond without them on some networks, so do not fail early.
+    for idx in indices:
         try:
-            session.get("https://www.nseindia.com", timeout=10)
-        except requests.RequestException:
-            pass
+            response = requests.get(
+                f"https://query1.finance.yahoo.com/v8/finance/chart/{idx['symbol']}",
+                params={"range": "1d", "interval": "1d"},
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=10,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            meta = payload["chart"]["result"][0]["meta"]
 
-        response = session.get(
-            "https://www.nseindia.com/api/ipo-current-issue",
-            timeout=15,
-        )
-        response.raise_for_status()
-        raw_issues = response.json()
+            price = (
+                meta.get("regularMarketPrice")
+                or meta.get("previousClose")
+                or 0
+            )
+            prev = (
+                meta.get("previousClose")
+                or meta.get("chartPreviousClose")
+                or price
+            )
+            change = round(float(price) - float(prev), 2)
+            change_pct = round(
+                (change / float(prev)) * 100, 2
+            ) if prev else 0.0
 
-        if isinstance(raw_issues, dict):
-            raw_issues = raw_issues.get("data", [])
-        elif not isinstance(raw_issues, list):
-            raw_issues = []
-
-        issues = []
-        for issue in raw_issues:
-            if not isinstance(issue, dict):
-                continue
-
-            subscription = issue.get("noOfTime")
-            try:
-                subscription_display = f"{float(subscription):.2f}x"
-            except (TypeError, ValueError):
-                subscription_display = "—"
-
-            issues.append({
-                "company": issue.get("companyName") or issue.get("symbol") or "NSE issue",
-                "symbol": issue.get("symbol") or "—",
-                "security_type": issue.get("series") or "—",
-                "open_date": issue.get("issueStartDate") or "—",
-                "close_date": issue.get("issueEndDate") or "—",
-                "price_band": issue.get("issuePrice") or "—",
-                "status": issue.get("status") or "Unknown",
-                "subscription": subscription_display,
+            results.append({
+                **idx,
+                "price":          round(float(price), 2),
+                "change":         change,
+                "change_percent": change_pct,
             })
 
-        payload = {
-            "issues": issues,
-            "source": "NSE India",
-            "source_url": "https://www.nseindia.com/market-data/all-upcoming-issues-ipo",
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-            "cached": False,
-        }
-        ipo_calendar_cache["updated_at"] = now
-        ipo_calendar_cache["payload"] = payload
-        return payload
+        except Exception:
+            results.append({
+                **idx,
+                "price":          None,
+                "change":         None,
+                "change_percent": None,
+            })
 
-    except (requests.RequestException, ValueError, TypeError) as error:
+    return {"indices": results}
+
+
+@app.get("/market-news")
+async def get_market_news(category: str = "stocks"):
+    """
+    Fetch Google News RSS articles for a given market category.
+    category options: stocks | ipo | fo | mutual_funds
+    """
+    query_map = {
+        "stocks":       "NSE BSE India stock market equity",
+        "ipo":          "IPO India new issue listing SEBI",
+        "fo":           "futures options F&O NSE India derivative",
+        "mutual_funds": "mutual fund SIP NAV India AMFI",
+    }
+    query = query_map.get(category.lower(), "India stock market")
+
+    try:
+        response = requests.get(
+            "https://news.google.com/rss/search",
+            params={
+                "q":    query,
+                "hl":   "en-IN",
+                "gl":   "IN",
+                "ceid": "IN:en",
+            },
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=12,
+        )
+        response.raise_for_status()
+
+        root = ET.fromstring(response.content)
+        articles = []
+
+        for item in root.findall("./channel/item")[:9]:
+            source = item.find("source")
+            articles.append({
+                "title":        item.findtext("title", "Market update"),
+                "url":          item.findtext("link", "#"),
+                "published_at": item.findtext("pubDate", "Recent"),
+                "source":       source.text if source is not None else "News",
+            })
+
+        return {"articles": articles, "category": category}
+
+    except Exception as error:
         raise HTTPException(
             status_code=502,
-            detail=(
-                "NSE's live IPO feed is temporarily unavailable. "
-                "Please try Refresh live data in a moment."
-            ),
-        ) from error
+            detail=f"Unable to retrieve market news: {str(error)}",
+        )
+
+
+@app.get("/ipo-calendar")
+async def get_ipo_calendar():
+    """
+    Fetch IPO data from Xflot, cache it, and return
+    separate Upcoming, Open, Closed, and Listed categories.
+    """
+
+    global ipo_calendar_cache
+
+    now = time.monotonic()
+
+    # 1. Return cached data when it is still fresh.
+    cached_payload = ipo_calendar_cache["payload"]
+
+    if (
+        cached_payload is not None
+        and now - ipo_calendar_cache["updated_at"] < IPO_CACHE_TTL
+    ):
+        return {**cached_payload, "cached": True}
+
+    async with ipo_fetch_lock:
+
+        # 2. Check the cache again after acquiring the lock.
+        now = time.monotonic()
+        cached_payload = ipo_calendar_cache["payload"]
+
+        if (
+            cached_payload is not None
+            and now - ipo_calendar_cache["updated_at"] < IPO_CACHE_TTL
+        ):
+            return {**cached_payload, "cached": True}
+
+        try:
+            # 3. Fetch all IPOs with one external API request.
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(15.0)
+            ) as client:
+
+                response = await client.get(
+                    IPO_API_URL,
+                    headers={"Accept": "application/json"},
+                )
+
+                response.raise_for_status()
+                raw_data = response.json()
+
+            # 4. Validate the API response.
+            if not isinstance(raw_data, dict):
+                raise ValueError(
+                    "Unexpected Xflot response format."
+                )
+
+            if raw_data.get("ok") is not True:
+                raise ValueError(
+                    "Xflot returned an unsuccessful response."
+                )
+
+            ipos = raw_data.get("ipos")
+
+            if not isinstance(ipos, list):
+                raise ValueError(
+                    "The Xflot response does not contain an ipos list."
+                )
+
+            # 5. Group IPOs by their reported status.
+            categories = {
+                "upcoming": [],
+                "open": [],
+                "closed": [],
+                "listed": [],
+            }
+
+            status_mapping = {
+                "UPCOMING": "upcoming",
+                "OPEN": "open",
+                "CLOSED": "closed",
+                "LISTED": "listed",
+            }
+
+            for issue in ipos:
+
+                if not isinstance(issue, dict):
+                    continue
+
+                status = str(
+                    issue.get("status", "")
+                ).strip().upper()
+
+                category = status_mapping.get(status)
+
+                if category is None:
+                    continue
+
+                # Preserve original provider fields.
+                # Add normalized fields for frontend compatibility.
+                normalized_issue = {
+                    **issue,
+                    "company": (
+                        issue.get("companyName")
+                        or issue.get("company_name")
+                        or issue.get("name")
+                        or issue.get("symbol")
+                        or "Unknown IPO"
+                    ),
+                    "symbol": issue.get("symbol") or "—",
+                    "status": status,
+                    "open_date": (
+                        issue.get("issueStartDate")
+                        or issue.get("openDate")
+                        or issue.get("open_date")
+                        or "—"
+                    ),
+                    "close_date": (
+                        issue.get("issueEndDate")
+                        or issue.get("closeDate")
+                        or issue.get("close_date")
+                        or "—"
+                    ),
+                    "price_band": (
+                        issue.get("issuePrice")
+                        or issue.get("priceBand")
+                        or issue.get("price_band")
+                        or "—"
+                    ),
+                }
+
+                categories[category].append(normalized_issue)
+
+            # 6. Build the response.
+            payload = {
+                **categories,
+                "count": {
+                    category: len(items)
+                    for category, items in categories.items()
+                },
+                "total": len(ipos),
+                "source": "Xflot",
+                "source_url": IPO_API_URL,
+                "updated_at": time.time(),
+                "disclaimer": raw_data.get("disclaimer"),
+            }
+
+            # 7. Cache only successfully validated responses.
+            ipo_calendar_cache = {
+                "updated_at": time.monotonic(),
+                "payload": payload,
+            }
+
+            return {**payload, "cached": False}
+
+        except (
+            httpx.HTTPError,
+            ValueError,
+            TypeError,
+        ) as error:
+
+            logger.exception(
+                "Unable to retrieve IPO calendar from Xflot."
+            )
+
+            # 8. If the provider fails, return stale data when available.
+            if ipo_calendar_cache["payload"] is not None:
+                return {
+                    **ipo_calendar_cache["payload"],
+                    "cached": True,
+                    "stale": True,
+                }
+
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    "Unable to retrieve IPO data from Xflot. "
+                    "Please try again later."
+                ),
+            ) from error
+

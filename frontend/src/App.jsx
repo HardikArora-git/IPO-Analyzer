@@ -53,6 +53,13 @@ function App() {
   const [loadingIpoIssues, setLoadingIpoIssues] = useState(false);
   const [ipoCalendarError, setIpoCalendarError] = useState("");
   const [ipoCalendarMeta, setIpoCalendarMeta] = useState(null);
+
+  // market overview & category news states
+  const [marketOverview, setMarketOverview] = useState([]);
+  const [loadingMarketOverview, setLoadingMarketOverview] = useState(false);
+  const [marketCategoryTab, setMarketCategoryTab] = useState("stocks");
+  const [marketCategoryNews, setMarketCategoryNews] = useState([]);
+  const [loadingMarketCategoryNews, setLoadingMarketCategoryNews] = useState(false);
   
   /* =========================
      HELPER: API ERROR
@@ -594,32 +601,151 @@ ${error.message}`,
     setSnapshot(null);
   };
 
-  const loadIpoCalendar = async () => {
-    setLoadingIpoIssues(true);
-    setIpoCalendarError("");
 
-    try {
-      const response = await fetch(`${API_URL}/ipo-calendar`);
-      const data = await response.json().catch(() => null);
+const loadIpoCalendar = async () => {
+  setLoadingIpoIssues(true);
+  setIpoCalendarError("");
 
-      if (!response.ok) {
-        throw new Error(getErrorMessage(data));
-      }
+  try {
+    const response = await fetch(`${API_URL}/ipo-calendar`);
+    const data = await response.json().catch(() => null);
 
-      setIpoIssues(Array.isArray(data?.issues) ? data.issues : []);
-      setIpoCalendarMeta({
-        source: data?.source || "NSE India",
-        updatedAt: data?.updated_at,
-        sourceUrl: data?.source_url,
-        cached: data?.cached,
-      });
-      setIpoPage(1);
-    } catch (requestError) {
-      setIpoCalendarError(requestError.message || "Unable to load the live IPO calendar.");
-      setIpoIssues([]);
-    } finally {
-      setLoadingIpoIssues(false);
+    if (!response.ok) {
+      throw new Error(getErrorMessage(data));
     }
+
+    // Support both the old "issues" format and the new
+    // category-based format returned by the backend.
+    let allIssues = [];
+
+    if (Array.isArray(data?.issues)) {
+      allIssues = data.issues;
+    } else {
+      const categories = [
+        ["upcoming", "UPCOMING"],
+        ["open", "OPEN"],
+        ["closed", "CLOSED"],
+        ["listed", "LISTED"],
+      ];
+
+      for (const [key, defaultStatus] of categories) {
+        if (Array.isArray(data?.[key])) {
+          const categoryIssues = data[key].map((issue) => ({
+            ...issue,
+            status: issue.status || defaultStatus,
+          }));
+
+          allIssues.push(...categoryIssues);
+        }
+      }
+    }
+
+    // Normalize field names so the existing table can display them.
+    const normalizedIssues = allIssues.map((issue) => ({
+      ...issue,
+      company:
+        issue.company ||
+        issue.companyName ||
+        issue.company_name ||
+        issue.name ||
+        "Unknown IPO",
+      symbol: issue.symbol || "—",
+      status: String(issue.status || "").toUpperCase(),
+
+      price_band:
+        issue.price_band ||
+        issue.priceBand ||
+        issue.issuePrice ||
+        "—",
+      open_date:
+        issue.open_date ||
+        issue.openDate ||
+        issue.issueStartDate ||
+        "—",
+      close_date:
+        issue.close_date ||
+        issue.closeDate ||
+        issue.issueEndDate ||
+        "—",
+      security_type:
+        issue.security_type ||
+        issue.securityType ||
+        issue.type ||
+        "—",
+      subscription: issue.subscription ?? "—",
+    }));
+
+    console.log("IPO calendar response:", data);
+    console.log("Normalized IPO issues:", normalizedIssues);
+
+    setIpoIssues(normalizedIssues);
+
+    setIpoCalendarMeta({
+      source: data?.source || "IPO data provider",
+      updatedAt: data?.updated_at,
+      sourceUrl: data?.source_url,
+      cached: data?.cached,
+    });
+
+    setIpoPage(1);
+  } catch (requestError) {
+    console.error("IPO calendar error:", requestError);
+
+    setIpoCalendarError(
+      requestError.message || "Unable to load the IPO calendar."
+    );
+
+    setIpoIssues([]);
+  } finally {
+    setLoadingIpoIssues(false);
+  }
+};
+
+
+
+  /* =========================
+     MARKET OVERVIEW
+  ========================= */
+
+  const getCategoryLabel = (key) => ({
+    stocks:       "NSE / BSE Equities",
+    ipo:          "Upcoming & Recent IPOs",
+    fo:           "Futures & Options",
+    mutual_funds: "Mutual Fund News",
+  }[key] || key);
+
+  const loadMarketOverview = async () => {
+    setLoadingMarketOverview(true);
+    try {
+      const res = await fetch(`${API_URL}/market-overview`);
+      const data = await res.json();
+      setMarketOverview(data.indices || []);
+    } catch {
+      setMarketOverview([]);
+    } finally {
+      setLoadingMarketOverview(false);
+    }
+  };
+
+  const loadMarketCategoryNews = async (category) => {
+    setLoadingMarketCategoryNews(true);
+    setMarketCategoryNews([]);
+    try {
+      const res = await fetch(`${API_URL}/market-news?category=${category}`);
+      const data = await res.json();
+      setMarketCategoryNews(data.articles || []);
+    } catch {
+      setMarketCategoryNews([]);
+    } finally {
+      setLoadingMarketCategoryNews(false);
+    }
+  };
+
+  const openMarkets = () => {
+    setActiveView("markets");
+    loadMarketOverview();
+    loadMarketCategoryNews("stocks");
+    setMarketCategoryTab("stocks");
   };
 
   const openIpoZone = () => {
@@ -683,8 +809,8 @@ ${error.message}`,
         </button>
 
         <nav className="main-nav" aria-label="Main navigation">
-          <button onClick={() => setActiveView("markets")}>Markets</button>
-          <button onClick={() => setActiveView("markets")}>Stocks</button>
+          <button onClick={openMarkets}>Markets</button>
+          <button onClick={openMarkets}>Stocks</button>
           <button onClick={() => setActiveView("home")}>Discover</button>
           <button onClick={openIpoZone}>IPOs</button>
           <button onClick={openResearch}>AI Research</button>
@@ -787,16 +913,112 @@ ${error.message}`,
 
         {activeView === "markets" && (
           <section className="market-page">
+
+            {/* ── TOPBAR ── */}
             <div className="market-page-topbar">
               <button className="back-link" onClick={() => setActiveView("home")}>← Discover</button>
-              <span>STOCKS</span>
+              <span>MARKETS</span>
               <button className="research-link" onClick={openResearch}>Analyze an IPO →</button>
             </div>
 
+            {/* ── MARKET PULSE HERO ── */}
+            <div className="mkt-hero">
+              <div className="mkt-hero-copy">
+                <p className="eyebrow">LIVE MARKET PULSE · INDIA</p>
+                <h1>Markets at a glance.</h1>
+                <p>Track indices, read category news, and research any listed stock — all in one workspace.</p>
+              </div>
+            </div>
+
+            {/* ── LIVE INDEX TICKERS ── */}
+            <div className="index-tickers">
+              {loadingMarketOverview && (
+                <div className="index-tickers-loading">Loading indices…</div>
+              )}
+              {marketOverview.map((idx) => (
+                <div
+                  key={idx.name}
+                  className={`index-ticker-card ${idx.change == null ? "" : idx.change >= 0 ? "idx-up" : "idx-down"}`}
+                >
+                  <div className="idx-top">
+                    <span className="idx-name">{idx.name}</span>
+                    <span className="idx-label">{idx.label}</span>
+                  </div>
+                  <strong className="idx-price">
+                    {idx.price == null ? "—" : idx.price.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                  </strong>
+                  <span className={`idx-change ${idx.change == null ? "" : idx.change >= 0 ? "positive" : "negative"}`}>
+                    {idx.change == null
+                      ? "Data unavailable"
+                      : `${idx.change >= 0 ? "+" : ""}${idx.change} (${idx.change_percent}%)`}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* ── MARKET CATEGORY NEWS ── */}
+            <div className="market-cat-section">
+              <div className="market-cat-header">
+                <div>
+                  <p className="eyebrow">MARKET NEWS</p>
+                  <h2>News by segment.</h2>
+                </div>
+                <div className="market-cat-tabs">
+                  {[
+                    { key: "stocks",       label: "📈 Stocks" },
+                    { key: "ipo",          label: "🚀 IPO" },
+                    { key: "fo",           label: "⚡ F&O" },
+                    { key: "mutual_funds", label: "💼 Mutual Funds" },
+                  ].map(({ key, label }) => (
+                    <button
+                      key={key}
+                      className={marketCategoryTab === key ? "active-cat-tab" : ""}
+                      onClick={() => {
+                        setMarketCategoryTab(key);
+                        loadMarketCategoryNews(key);
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <p className="cat-subtitle">{getCategoryLabel(marketCategoryTab)}</p>
+
+              {loadingMarketCategoryNews ? (
+                <div className="cat-news-loading">
+                  <span className="spinner" />
+                  Loading latest news…
+                </div>
+              ) : (
+                <div className="cat-news-grid">
+                  {marketCategoryNews.length === 0 ? (
+                    <p className="news-empty">No recent articles found.</p>
+                  ) : (
+                    marketCategoryNews.map((article, i) => (
+                      <a
+                        href={article.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="cat-news-card"
+                        key={`${article.url}-${i}`}
+                      >
+                        <span className="cat-news-source">{article.source}</span>
+                        <b className="cat-news-title">{article.title}</b>
+                        <small className="cat-news-date">{new Date(article.published_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</small>
+                      </a>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ── COMPANY EXPLORER ── */}
             <div className="market-search-panel">
               <div>
                 <p className="eyebrow">COMPANY EXPLORER</p>
-                <h1>Research any listed company.</h1>
+                <h2>Research any listed company.</h2>
               </div>
               <div className="market-search-controls market-page-search">
                 <input
@@ -813,7 +1035,7 @@ ${error.message}`,
               </div>
             </div>
 
-            {stockError && <p className="market-error">{stockError}</p>}
+            {stockError && <p className="market-error" style={{padding:"0 clamp(20px,5vw,80px)"}}>{stockError}</p>}
 
             {!stockData && !loadingStock && (
               <div className="market-empty-state">
@@ -824,7 +1046,7 @@ ${error.message}`,
             )}
 
             {stockData && (
-              <>
+              <div className="stock-result-wrapper">
                 <div className="company-profile-header">
                   <div>
                     <p className="eyebrow">NSE · {stockData.symbol.replace(".NS", "")}</p>
@@ -875,7 +1097,7 @@ ${error.message}`,
                     </div>
                   </section>
                 </div>
-              </>
+              </div>
             )}
           </section>
         )}
@@ -977,8 +1199,8 @@ ${error.message}`,
                         <td><b>{issue.company}</b><small>{issue.security_type}</small></td>
                         <td>{issue.symbol}</td>
                         <td>{issue.price_band}</td>
-                        <td>{issue.open_date}</td>
-                        <td>{issue.close_date}</td>
+                        <td>{issue.open_date ? new Date(issue.open_date).toLocaleDateString("en-IN", { timeZone: "UTC" }) : "—"}</td>
+                        <td>{issue.close_date ? new Date(issue.close_date).toLocaleDateString("en-IN", { timeZone: "UTC" }) : "—"}</td>
                         <td><span className="ipo-status">{issue.status}</span></td>
                         <td className="growth-cell">{issue.subscription}</td>
                         <td><button className="read-ipo-btn" onClick={openResearch}>Analyze</button></td>
@@ -1031,10 +1253,10 @@ ${error.message}`,
                 <h2>Four questions before you apply.</h2>
               </div>
               <ol>
-                <li><b>What is changing?</b><span>Identify the growth trigger, not just the headline.</span></li>
-                <li><b>Where does the money go?</b><span>Review use of proceeds, debt reduction, and promoter exits.</span></li>
-                <li><b>What can go wrong?</b><span>Read the concentration, litigation, governance, and execution risks.</span></li>
-                <li><b>What are the alternatives?</b><span>Compare the business and its valuation with listed peers.</span></li>
+                <ol><p><b>1. What is changing?</b></p><span>Identify the growth trigger, not just the headline.</span></ol>
+                <ol><p><b>2. Where does the money go?</b></p><span>Review use of proceeds, debt reduction, and promoter exits.</span></ol>
+                <ol><p><b>3. What can go wrong?</b></p><span>Read the concentration, litigation, governance, and execution risks.</span></ol>
+                <ol><p><b>4. What are the alternatives?</b></p><span>Compare the business and its valuation with listed peers.</span></ol>
               </ol>
             </section>
 
