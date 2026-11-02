@@ -2,7 +2,7 @@ import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import "./App.css";
 import StockChart from "./StockChart"; // Import the StockChart component
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 function App() {
   /* =========================
@@ -441,7 +441,7 @@ ${error.message}`,
     setLoadingInsights(true);
 
     const response = await fetch(
-      "http://127.0.0.1:8000/insights"
+      `${API_URL}/insights`
     );
 
     const data = await response.json();
