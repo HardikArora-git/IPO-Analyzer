@@ -24,7 +24,7 @@ import httpx
 
 
 app = FastAPI()
-frontend_url = os.getenv( "FRONTEND_URL", "https://greenipo-ai-frontend.onrender.com" ) 
+frontend_url = os.getenv( "FRONTEND_URL", "https://greenipo-ai.onrender.com" ) 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
