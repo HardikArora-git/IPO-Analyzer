@@ -1,5 +1,6 @@
 import logging
 from operator import index
+import os
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
@@ -23,13 +24,14 @@ import httpx
 
 
 app = FastAPI()
+frontend_url = os.getenv( "FRONTEND_URL", "https://greenipo-ai-frontend.onrender.com" ) 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "https://greenipo-ai-frontend.onrender.com",
-    ],
+        frontend_url,
+        ],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
