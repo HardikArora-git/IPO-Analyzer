@@ -1,19 +1,27 @@
 import os
+import time
 import requests
 from dotenv import load_dotenv
 
 load_dotenv()
 
-API_KEY = os.getenv("API_KEY")
+# Support both environment variable names
+API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("API_KEY")
+
+# Keep model configurable through Render environment variables
+MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+
+BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
 
-def generate_answer(context, question,language = "hinglish"):
+def generate_answer(context, question, language="hinglish"):
 
-    url = (
-        "https://generativelanguage.googleapis.com/"
-        "v1beta/models/gemini-3.8-flash:generateContent"
-        f"?key={API_KEY}"
-    )
+    if not API_KEY:
+        raise RuntimeError(
+            "Gemini API key is missing. Set GEMINI_API_KEY in environment variables."
+        )
+
+    url = f"{BASE_URL}/{MODEL_NAME}:generateContent"
 
     prompt = f"""
 You are an IPO document analysis assistant.
@@ -40,7 +48,8 @@ Language and style rules:
 - Explain difficult financial terms in very simple words.
 - Do not give direct buy, sell, or investment advice.
 
-Give a clear and simple answer."""
+Give a clear and simple answer.
+"""
 
     data = {
         "contents": [
@@ -54,12 +63,98 @@ Give a clear and simple answer."""
         ]
     }
 
-    response = requests.post(url, json=data)
+    headers = {
+        "Content-Type": "application/json"
+    }
 
-    response.raise_for_status()
+    max_retries = 3
 
-    result = response.json()
+    for attempt in range(max_retries):
 
-    answer = result["candidates"][0]["content"]["parts"][0]["text"]
+        try:
+            response = requests.post(
+                url,
+                headers=headers,
+                params={"key": API_KEY},
+                json=data,
+                timeout=(10, 60)
+            )
 
-    return answer
+            if response.status_code in [429, 500, 502, 503, 504]:
+
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** (attempt + 1)
+
+                    print(
+                        f"Gemini temporary error: {response.status_code}. "
+                        f"Retrying in {wait_time} seconds..."
+                    )
+
+                    time.sleep(wait_time)
+                    continue
+
+            response.raise_for_status()
+
+            result = response.json()
+
+            candidates = result.get("candidates", [])
+
+            if not candidates:
+                raise RuntimeError(
+                    "Gemini returned no answer. Please try another question."
+                )
+
+            answer = (
+                candidates[0]
+                .get("content", {})
+                .get("parts", [{}])[0]
+                .get("text")
+            )
+
+            if not answer:
+                raise RuntimeError("Gemini returned an empty answer.")
+
+            return answer
+
+        except requests.exceptions.Timeout:
+            if attempt < max_retries - 1:
+                time.sleep(2 ** (attempt + 1))
+                continue
+
+            raise RuntimeError(
+                "Gemini request timed out after multiple attempts."
+            )
+
+        except requests.exceptions.HTTPError as e:
+            status_code = e.response.status_code
+
+            if status_code == 401 or status_code == 403:
+                raise RuntimeError(
+                    "Gemini API authentication failed. Check your API key."
+                )
+
+            if status_code == 429:
+                raise RuntimeError(
+                    "Gemini API quota or rate limit exceeded. Try again later."
+                )
+
+            if status_code in [500, 502, 503, 504]:
+                raise RuntimeError(
+                    "Gemini service is temporarily unavailable. Please try again later."
+                )
+
+            raise RuntimeError(
+                f"Gemini API returned HTTP {status_code}: "
+                f"{e.response.text[:500]}"
+            )
+
+        except requests.exceptions.RequestException:
+            if attempt < max_retries - 1:
+                time.sleep(2 ** (attempt + 1))
+                continue
+
+            raise RuntimeError(
+                "Unable to connect to Gemini API. Check your internet connection."
+            )
+
+    raise RuntimeError("Gemini request failed after multiple attempts.")

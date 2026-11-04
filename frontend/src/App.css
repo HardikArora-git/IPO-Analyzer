@@ -1179,3 +1179,555 @@ button:disabled {
   padding: 0 clamp(20px, 5vw, 80px) 48px;
 }
 
+/* =========================================================
+   RESPONSIVE LAYOUT PATCH
+   Visual theme is intentionally unchanged:
+   no color, font-family, border, shadow, or component redesign.
+   These rules only prevent clipping and reflow existing elements.
+========================================================= */
+
+/* Allow grid/flex children to shrink instead of forcing page overflow. */
+.app,
+main,
+.home-page,
+.market-page,
+.ipo-zone,
+.market-dashboard,
+.chat-container,
+.stock-result-wrapper,
+.market-details-grid,
+.market-detail-card,
+.market-chart-card,
+.upload-card,
+.risk-dashboard,
+.insights-dashboard,
+.snapshot-card,
+.site-footer,
+.home-hero,
+.hero-copy,
+.hero-visual {
+  min-width: 0;
+  max-width: 100%;
+}
+
+img,
+svg,
+canvas,
+video {
+  max-width: 100%;
+}
+
+/* Tablet and smaller screens */
+@media (max-width: 800px) {
+  /* Keep the existing navigation available instead of hiding it. */
+  .site-header {
+    height: auto;
+    min-height: 66px;
+    padding: 10px 18px;
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .main-nav {
+    display: flex;
+    order: 3;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    gap: 20px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    scrollbar-width: thin;
+    padding: 2px 0 6px;
+  }
+
+  .main-nav button {
+    flex: 0 0 auto;
+  }
+
+  .profile-button {
+    margin-left: auto;
+  }
+
+  .home-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hero-visual {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .index-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .product-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .market-page-topbar,
+  .ipo-zone-topbar {
+    gap: 12px;
+    flex-wrap: wrap;
+
+  }
+
+  .back-link,
+  .research-link {
+
+  }
+
+  .market-search-panel,
+  .market-cat-header,
+  .company-profile-header,
+  .company-header {
+    min-width: 0;
+  }
+
+  .market-page-search,
+  .market-search-controls {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .market-page-search input,
+  .market-search-controls input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .market-details-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .market-detail-card,
+  .news-card {
+    min-width: 0;
+  }
+
+  .ipo-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ipo-score-preview {
+    justify-self: start;
+  }
+
+  .ipo-tool-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ipo-tool-featured {
+    grid-row: auto;
+  }
+
+  .ipo-checklist {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .site-footer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .footer-links {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .chat-header {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .chat-header h2 {
+    width: 100%;
+    text-align: left;
+  }
+
+  .chat-header button {
+    flex: 1 1 145px;
+    min-width: 0;
+    width: auto;
+  }
+
+  .question-box {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .question-box input {
+    flex: 1 1 auto;
+    width: 0;
+    min-width: 0;
+  }
+
+  .question-box button {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 100px;
+  }
+
+  .risk-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .insights-grid,
+  .snapshot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .market-chart-card .stock-chart,
+  .stock-chart {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+/* Phones */
+@media (max-width: 480px) {
+  main {
+    padding: 15px 10px;
+  }
+
+  .site-header {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .main-nav {
+    gap: 16px;
+  }
+
+  .main-nav button {
+
+  }
+
+  .hero-copy h1 {
+
+  }
+
+  .hero-description {
+
+  }
+
+  .hero-actions {
+    align-items: stretch;
+  }
+
+  .hero-actions button {
+    flex: 1 1 145px;
+  }
+
+  .hero-visual {
+    min-height: 280px;
+  }
+
+  .orb-one {
+    width: min(300px, 85vw);
+    height: min(300px, 85vw);
+    right: 0;
+  }
+
+  .orb-two {
+    width: min(220px, 65vw);
+    height: min(220px, 65vw);
+    right: 18%;
+  }
+
+  .signal-main {
+    right: 0;
+    left: auto;
+    width: min(350px, 94%);
+    padding: 18px;
+  }
+
+  .signal-float {
+    left: 2%;
+    max-width: 80%;
+  }
+
+  .index-grid,
+  .product-rail,
+  .ipo-tool-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .universal-search {
+    min-width: 0;
+    gap: 8px;
+    padding-left: 12px;
+  }
+
+  .universal-search input {
+    width: 0;
+    min-width: 0;
+
+  }
+
+  .section-title-row {
+    gap: 12px;
+  }
+
+  .market-page-topbar,
+  .ipo-zone-topbar {
+
+  }
+
+  .back-link,
+  .research-link {
+
+  }
+
+  .mkt-hero,
+  .market-cat-section,
+  .index-tickers,
+  .stock-result-wrapper {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .market-search-panel {
+    padding-top: 32px;
+  }
+
+  .market-search-controls {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .market-search-controls input {
+    flex: 1 1 100%;
+  }
+
+  .market-search-controls button {
+    flex: 1 1 100%;
+  }
+
+  .company-profile-header,
+  .company-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .quote-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .quote-row strong {
+
+    overflow-wrap: anywhere;
+  }
+
+  .market-chart-card {
+    padding: 8px 4px 4px;
+    min-width: 0;
+  }
+
+  .market-chart-card .stock-chart,
+  .stock-chart {
+    min-width: 0;
+  }
+
+  .market-detail-card {
+    padding: 16px;
+  }
+
+  .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .market-cat-tabs {
+    max-width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 5px;
+  }
+
+  .market-cat-tabs button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .ipo-hero {
+    gap: 24px;
+  }
+
+  .ipo-hero h1 {
+
+  }
+
+  .ipo-score-preview {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .score-factors {
+    flex-wrap: wrap;
+  }
+
+  .score-factors span {
+    flex: 1 1 80px;
+  }
+
+  .ipo-tabs {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .ipo-tabs button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .ipo-tracker-note {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .ipo-filter-bar > div {
+    width: 100%;
+  }
+
+  .ipo-filter-bar .filter-icon {
+    max-width: 100%;
+  }
+
+  /* Table keeps its original columns and design; only this table scrolls. */
+  .ipo-table-shell {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ipo-table {
+    min-width: 920px;
+  }
+
+  .footer-links {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .footer-bottom {
+    min-width: 0;
+  }
+
+  .chat-header {
+    flex-direction: row;
+    align-items: center;
+    padding: 12px;
+  }
+
+  .chat-header h2 {
+    text-align: left;
+
+  }
+
+  .chat-header button {
+    flex: 1 1 130px;
+    min-width: 0;
+    width: auto;
+    padding: 10px 9px;
+
+  }
+
+  .messages {
+    min-width: 0;
+    min-height: 320px;
+    padding: 15px 10px;
+  }
+
+  .message {
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    padding: 13px;
+
+  }
+
+  .message pre,
+  .message table {
+    max-width: 100%;
+    overflow-x: auto;
+    display: block;
+  }
+
+  .question-box {
+    flex-direction: row;
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .question-box input {
+    flex: 1 1 auto;
+    width: 0;
+    min-width: 0;
+    padding: 12px 10px;
+
+  }
+
+  .question-box button {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 82px;
+    padding: 10px;
+
+  }
+
+  .risk-grid,
+  .insights-grid,
+  .snapshot-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .risk-card,
+  .insight-card,
+  .snapshot-item {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .upload-card {
+    padding: 22px 14px;
+  }
+
+  .market-dashboard {
+    padding: 14px;
+  }
+
+  .market-price-card > div {
+    min-width: 0;
+    flex: 1 1 120px;
+  }
+}
+
+/* Very narrow phones (320–360px) */
+@media (max-width: 360px) {
+  .brand {
+
+  }
+
+  .hero-copy h1 {
+
+  }
+
+  .signal-main strong {
+
+  }
+
+  .quote-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .chat-header button {
+    flex-basis: 100%;
+  }
+
+  .question-box button {
+    min-width: 74px;
+  }
+}
