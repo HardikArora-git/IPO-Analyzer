@@ -9,7 +9,7 @@ load_dotenv()
 API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("API_KEY")
 
 # Keep model configurable through Render environment variables
-MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")  # Default to Gemini 3.5 Flash Lite if not set
 
 BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 

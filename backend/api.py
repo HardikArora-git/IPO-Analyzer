@@ -25,7 +25,7 @@ import httpx
 
 app = FastAPI()
 frontend_url = os.getenv( "FRONTEND_URL", "https://greenipo-ai.onrender.com" ) 
-app = FastAPI()
+
 
 # Allow all origins — both local dev and Render frontend work automatically.
 app.add_middleware(
