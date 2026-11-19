@@ -2,7 +2,9 @@ import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import "./App.css";
 import StockChart from "./StockChart"; // Import the StockChart component
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const RAW_API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const API_URL = RAW_API_URL.replace(/\/+$/, "");
+console.log("Current API_URL:", API_URL);
 
 function App() {
   /* =========================
@@ -12,6 +14,8 @@ function App() {
   const [file, setFile] = useState(null);
   const [uploaded, setUploaded] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadMessage, setUploadMessage] = useState("");
 
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState([]);
@@ -111,6 +115,8 @@ function App() {
     }
 
     setUploading(true);
+    setUploadProgress(0);
+    setUploadMessage("Uploading PDF...");
     setError("");
 
     const formData = new FormData();
@@ -121,14 +127,47 @@ function App() {
         method: "POST",
         body: formData,
       });
+      const uploadData = await response.json();
+      if (!response.ok) throw new Error(getErrorMessage(uploadData));
+      if (!uploadData.job_id) throw new Error("The server did not return a processing job ID.");
 
-      const data = await response.json();
+      setUploadMessage("PDF uploaded. Preparing document processing...");
 
-      if (!response.ok) {
-        throw new Error(getErrorMessage(data));
+      // Poll the background job without blocking the backend upload request.
+      let completedData = null;
+      for (let attempt = 0; attempt < 1800; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const statusResponse = await fetch(
+          `${API_URL}/upload-status/${encodeURIComponent(uploadData.job_id)}`
+        );
+        const statusData = await statusResponse.json();
+        if (!statusResponse.ok) throw new Error(getErrorMessage(statusData));
+
+        setUploadProgress(Number(statusData.progress || 0));
+        setUploadMessage(statusData.message || "Processing your PDF...");
+
+        if (statusData.status === "completed") {
+          completedData = statusData;
+          break;
+        }
+        if (statusData.status === "failed") {
+          throw new Error(statusData.error || statusData.message || "PDF processing failed.");
+        }
       }
 
+      if (!completedData) {
+        throw new Error("PDF processing is taking longer than expected. Please check again or retry.");
+      }
+
+      setUploadProgress(100);
       setUploaded(true);
+      const stats = completedData.extraction_stats || {};
+      const ocrNote = stats.pages_ocr
+        ? `\n\nOCR extracted text from ${stats.pages_ocr} scanned page(s).`
+        : "";
+      const unreadableNote = stats.pages_without_text
+        ? `\n\n${stats.pages_without_text} page(s) had no extractable text. If these pages contain scanned images, install/enable Tesseract OCR on the server.`
+        : "";
 
       setMessages([
         {
@@ -137,7 +176,7 @@ function App() {
 
 Your IPO document has been successfully processed.
 
-**${data.total_chunks} chunks** were created from the document.
+**${completedData.total_chunks} chunks** were created from **${stats.total_pages || "the"} pages**.${ocrNote}${unreadableNote}
 
 You can now:
 
@@ -151,12 +190,11 @@ You can now:
       ]);
     } catch (error) {
       console.error("Upload Error:", error);
-
       setError(error.message);
-
       alert(`Upload failed: ${error.message}`);
     } finally {
       setUploading(false);
+      setUploadMessage("");
     }
   };
 
@@ -591,6 +629,8 @@ ${error.message}`,
   const handleNewDocument = () => {
     setUploaded(false);
     setFile(null);
+    setUploadProgress(0);
+    setUploadMessage("");
     setMessages([]);
     setQuestion("");
 
@@ -1303,6 +1343,19 @@ const loadIpoCalendar = async () => {
               <p className="file-name">
                 ✅ Selected: {file.name}
               </p>
+            )}
+
+            {uploading && (
+              <div className="upload-progress-wrap" aria-live="polite">
+                <div className="upload-progress-heading">
+                  <span>{uploadMessage || "Processing PDF..."}</span>
+                  <strong>{uploadProgress}%</strong>
+                </div>
+                <div className="upload-progress-track">
+                  <div className="upload-progress-fill" style={{ width: `${uploadProgress}%` }} />
+                </div>
+                <small>Large documents are processed in page batches. You can keep this page open.</small>
+              </div>
             )}
 
             <button

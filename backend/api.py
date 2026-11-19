@@ -19,18 +19,24 @@ import requests
 import time
 from datetime import datetime, timezone
 from xml.etree import ElementTree as ET
-import asyncio    
+import asyncio
 import httpx
+import uuid
+from pdf_processor import extract_text_batches
 
 
 app = FastAPI()
-frontend_url = os.getenv( "FRONTEND_URL", "https://greenipo-ai.onrender.com" ) 
+frontend_url = os.getenv( "FRONTEND_URL", "https://greenipo-ai.onrender.com/" ) 
 
 
 # Allow all origins — both local dev and Render frontend work automatically.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "*",
+        "http://localhost:5173",
+        "https://greenipo-ai.onrender.com"
+    ],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -40,9 +46,10 @@ class QueryRequest(BaseModel):
     question: str
     language: str = "hinglish"  # default language
 
-UPLOAD_FOLDER = Path("uploads")
-UPLOAD_FOLDER.mkdir(exist_ok=True)
-
+# UPLOAD_FOLDER = Path("uploads")
+# UPLOAD_FOLDER.mkdir(exist_ok=True)
+UPLOAD_FOLDER = Path("/tmp/uploads")
+UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 # global storage for current upload document
 document_data = {}
 
@@ -73,47 +80,115 @@ def home():
         "message": "IPO AI Analyzer Backend is Running! 🚀",
     }
 
+# Upload jobs are kept in process memory. For a single Render instance this is
+# sufficient for live progress; durable multi-instance jobs can be added later.
+upload_jobs = {}
+UPLOAD_MAX_BYTES = int(os.getenv("UPLOAD_MAX_BYTES", str(500 * 1024 * 1024)))
+
+
+def _update_upload_job(job_id, **values):
+    job = upload_jobs.get(job_id)
+    if job is not None:
+        job.update(values)
+
+
+async def _process_upload_job(job_id, filename, file_path):
+    try:
+        _update_upload_job(job_id, status="processing", stage="extracting", message="Reading PDF pages...")
+
+        def report_progress(update):
+            _update_upload_job(job_id, **update, message="Extracting PDF pages in batches...")
+
+        chunks, extraction_stats = await asyncio.to_thread(
+            extract_text_batches, file_path, report_progress, 25, 1000, 100
+        )
+
+        if not chunks:
+            raise ValueError(
+                "No readable text was found. This PDF may be scanned or image-only. "
+                "Install the OCR requirements (Tesseract) and try again."
+            )
+
+        _update_upload_job(
+            job_id, stage="embedding", progress=80, total_chunks=len(chunks),
+            message="Preparing searchable document data..."
+        )
+        embeddings, vocabulary, idf = await asyncio.to_thread(create_embedding, chunks)
+
+        document_data.clear()
+        document_data[filename] = {
+            "chunks": chunks,
+            "embeddings": embeddings,
+            "vocabulary": vocabulary,
+            "idf": idf,
+            "extraction_stats": extraction_stats,
+        }
+
+        _update_upload_job(
+            job_id, status="completed", stage="completed", progress=100,
+            total_chunks=len(chunks), extraction_stats=extraction_stats,
+            message="Your IPO document is ready for AI analysis."
+        )
+    except Exception as exc:
+        logger.exception("PDF processing failed for job %s", job_id)
+        _update_upload_job(
+            job_id, status="failed", stage="failed",
+            message=str(exc) or "PDF processing failed.", error=str(exc)
+        )
+
+
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
+    original_name = file.filename or "uploaded_document.pdf"
+    if not original_name.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed.")
 
-    # check pdf
-    if not file.filename.endswith(".pdf"):
-        return {"error": "Only PDF files are allowed."}
+    # Remove path components supplied by the client and avoid overwriting files.
+    safe_name = Path(original_name.replace("\\", "/")).name
+    job_id = uuid.uuid4().hex
+    file_path = UPLOAD_FOLDER / f"{job_id}_{safe_name}"
+    total_bytes = 0
 
-    file_path = UPLOAD_FOLDER / file.filename
+    try:
+        with file_path.open("wb") as output:
+            while True:
+                block = await file.read(1024 * 1024)
+                if not block:
+                    break
+                total_bytes += len(block)
+                if total_bytes > UPLOAD_MAX_BYTES:
+                    output.close()
+                    file_path.unlink(missing_ok=True)
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"PDF exceeds the {UPLOAD_MAX_BYTES // (1024 * 1024)} MB upload limit."
+                    )
+                output.write(block)
+    finally:
+        await file.close()
 
-    # save the uploaded file
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    #  extract text
-    raw_text = extract_text(file_path)
-    # Clean text
-    cleaned_text = clean_text(raw_text)
-    # Create chunks
-    chunks = create_chunks(cleaned_text)
-
-    # Create embeddings
-    embeddings, vocabulary, idf = create_embedding(chunks)
-
-    # store document data
-    document_data.clear()
-
-
-    # store document data
-    document_data[file.filename] = {
-        "chunks": chunks,
-        "embeddings": embeddings,
-        "vocabulary": vocabulary,
-        "idf": idf
+    upload_jobs[job_id] = {
+        "job_id": job_id, "filename": safe_name, "status": "queued",
+        "stage": "queued", "progress": 0, "processed_pages": 0,
+        "total_pages": 0, "total_chunks": 0, "message": "Upload complete. Processing will start shortly."
     }
+    asyncio.create_task(_process_upload_job(job_id, safe_name, file_path))
 
     return {
-        "message": f"File '{file.filename}' uploaded successfully.",
-        "filename": file.filename,
-        "path": str(file_path),
-        "total_chunks": len(chunks)
+        "message": "PDF uploaded. Background processing has started.",
+        "job_id": job_id,
+        "filename": safe_name,
+        "status": "queued",
     }
+
+
+@app.get("/upload-status/{job_id}")
+async def get_upload_status(job_id: str):
+    job = upload_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Upload job not found or server restarted.")
+    return dict(job)
+
 
 @app.post("/ask")
 async def ask_question(request: QueryRequest):

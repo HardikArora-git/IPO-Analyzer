@@ -28,7 +28,7 @@ chunks = create_chunks(cleaned_text)
 embeddings, vocabulary, idf = create_embedding(chunks)
 
 print(f"Total chunks created: {len(chunks)}")
-print(f"embeddings shape: {embeddings.shape}")
+print(f"Sparse embeddings created: {len(embeddings)} vectors")
 # print("\nfirst chunks")
 
 # print(chunks[0])

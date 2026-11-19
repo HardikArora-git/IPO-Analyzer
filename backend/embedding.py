@@ -1,66 +1,33 @@
+"""Sparse TF-IDF embeddings to avoid dense chunk-by-vocabulary matrices."""
 import math
 import re
+from collections import Counter
 
 
 def tokenize(text):
-    return re.findall(r"\b[a-zA-Z]+\b", text.lower())
-
-
-def build_vocabulary(chunks):
-    vocabulary = {}
-
-    for chunk in chunks:
-        for word in tokenize(chunk):
-            if word not in vocabulary:
-                vocabulary[word] = len(vocabulary)
-
-    return vocabulary
-
-
-def calculate_tfidf(chunks, vocabulary):
-    total_documents = len(chunks)
-    document_frequency = [0] * len(vocabulary)
-
-    for chunk in chunks:
-        for word in set(tokenize(chunk)):
-            if word in vocabulary:
-                document_frequency[vocabulary[word]] += 1
-
-    return [
-        math.log((total_documents + 1) / (frequency + 1)) + 1
-        for frequency in document_frequency
-    ]
+    return re.findall(r"\b[a-zA-Z0-9]+\b", str(text).lower())
 
 
 def create_embedding(chunks):
-    vocabulary = build_vocabulary(chunks)
-    idf = calculate_tfidf(chunks, vocabulary)
+    tokenized = [tokenize(chunk) for chunk in chunks]
+    document_frequency = Counter()
+    for words in tokenized:
+        document_frequency.update(set(words))
+
+    total_documents = max(len(tokenized), 1)
+    vocabulary = {word: index for index, word in enumerate(document_frequency)}
+    idf = {
+        word: math.log((total_documents + 1) / (frequency + 1)) + 1
+        for word, frequency in document_frequency.items()
+    }
 
     embeddings = []
-
-    for chunk in chunks:
-        vector = [0.0] * len(vocabulary)
-
-        for word in tokenize(chunk):
-            if word in vocabulary:
-                vector[vocabulary[word]] += 1
-
-        embeddings.append([
-            value * idf[index]
-            for index, value in enumerate(vector)
-        ])
-
+    for words in tokenized:
+        counts = Counter(words)
+        embeddings.append({word: count * idf[word] for word, count in counts.items()})
     return embeddings, vocabulary, idf
 
 
 def create_query_embedding(query, vocabulary, idf):
-    vector = [0.0] * len(vocabulary)
-
-    for word in tokenize(query):
-        if word in vocabulary:
-            vector[vocabulary[word]] += 1
-
-    return [
-        value * idf[index]
-        for index, value in enumerate(vector)
-    ]
+    counts = Counter(word for word in tokenize(query) if word in vocabulary)
+    return {word: count * idf[word] for word, count in counts.items()}
